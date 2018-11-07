@@ -13,29 +13,27 @@ def sort_message(msg):
 		return
 
 	msg_command = msg['text'].split()[0].replace('/', '').strip().lower()
-	if msg_command in ['ack', 'get']:
-		response = None
-		if msg_command == 'ack':
-			response = command_ack(msg)
-		elif msg_command == 'get':
-			response = command_get(msg)
+	try:
+		response = eval("command_" + msg_command)(msg)
 
 		if response == None:
-			bot.sendMessage(msg_chat_id, "Unable to do what asked for. Sorry.")
+			bot.sendMessage(msg_chat_id, "Unable to do what asked for. Sorry.", parse_mode='Markdown')
 		else:
-			bot.sendMessage(msg_chat_id, response)
-	elif msg_command == 'start':
-		return
-	else:
+			bot.sendMessage(msg_chat_id, response, parse_mode='Markdown')
+	except NameError as error:
 		bot.sendMessage(msg_chat_id, "Unrecognized command: `{}`".format(msg['text']), parse_mode='Markdown')
 
 
+def command_ping(msg):
+	return "I'm still here. Tell me."
+
+
 def command_ack(msg):
-	return "Still in WIP"
+	return "`ack`: still under development."
 
 
 def command_get(msg):
-	return "Still in WIP"
+	return "`get`: still under development."
 
 
 if 'TELEGRAM_BOT_TOKEN' not in os.environ or 'ICINGA2_API_USER' not in os.environ or 'ICINGA2_API_PWD' not in os.environ:
