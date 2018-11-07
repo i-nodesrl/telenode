@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 
+import inotify.adapters
+import inotify.constants
 import os
 import sys
 import time
@@ -43,5 +45,9 @@ if 'TELEGRAM_BOT_TOKEN' not in os.environ or 'ICINGA2_API_USER' not in os.enviro
 bot = telepot.Bot(os.environ['TELEGRAM_BOT_TOKEN'])
 MessageLoop(bot, sort_message).run_as_thread()
 
-while 1:
-	time.sleep(10)
+i = inotify.adapters.Inotify()
+i.add_watch(sys.argv[0], mask=inotify.constants.IN_MODIFY)
+for event in i.event_gen(yield_nones=False):
+	print "Reloading updated bot version"
+	os.execve(sys.argv[0], sys.argv, os.environ)
+	sys.exit(1)
