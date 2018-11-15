@@ -2,6 +2,7 @@
 
 import inotify.adapters
 import inotify.constants
+import json
 import os
 import requests
 import sys
@@ -18,16 +19,13 @@ def on_chat_message(msg):
 		return
 
 	msg_command = msg_command.replace('/', '')
+
+	if msg_command == 'start':
+		return
 	try:
 		eval("command_" + msg_command)(msg, msg_chat_id)
-		# if response == None:
-		# 	bot.sendMessage(msg_chat_id, "Unable to do what asked for. Sorry.", parse_mode='Markdown')
-		# elif 'keyboard' in response:
-		# 	bot.sendMessage(msg_chat_id, response['msg'], parse_mode='Markdown', reply_markup=response['keyboard'])
-		# else:
-		# 	bot.sendMessage(msg_chat_id, response['msg'], parse_mode='Markdown')
 	except NameError as error:
-		bot.sendMessage(msg_chat_id, "Comando `{}` non riconosciuto".format(msg['text']), parse_mode='Markdown')
+		bot.sendMessage(msg_chat_id, "Comando `{}` non eseguito: ```{}```".format(msg['text'], str(error)), parse_mode='Markdown')
 
 
 def command_ping(msg, msg_chat_id):
@@ -35,11 +33,19 @@ def command_ping(msg, msg_chat_id):
 
 
 def command_ack(msg, msg_chat_id):
-	keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=host['display_name'], callback_data="ack:" + host['display_name'].lower())] for host in icinga_hosts()])
-	bot.sendMessage(msg_chat_id, "Seleziona un host", parse_mode='Markdown', reply_markup=keyboard)
+	problems = icinga_get_problems()
+	if len(problems) > 0:
+		keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=problem['display_name'], callback_data="ack:" + problem['problem_name'])] for problem in problems])
+		bot.sendMessage(msg_chat_id, "Seleziona un problema", parse_mode='Markdown', reply_markup=keyboard)
+	else:
+		bot.sendMessage(msg_chat_id, "Nessun problema rilevato.", parse_mode='Markdown')
 
 
 def command_get(msg, msg_chat_id):
+	pass
+
+
+def command_broadcast(msg, msg_chat_id):
 	pass
 
 
@@ -55,21 +61,31 @@ def on_callback_query(msg):
 
 
 def callback_ack(msg_data, msg_chat_id, msg_query_id):
-	# query: 'ack:host'
-	if msg_data.count(':') == 1:
-		keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='Stato generale', callback_data=msg_data + ':overall')]] +
-										[[InlineKeyboardButton(text=service, callback_data=msg_data + ':' + service.lower())] for service in ["Service1", "Service2", "Service3"]])
-		bot.sendMessage(msg_chat_id, "Seleziona un servizio", parse_mode='Markdown', reply_markup=keyboard)
-	# query: 'ack:host:service'
-	elif msg_data.count(':') == 2:
-		bot.answerCallbackQuery(msg_query_id, text="Inviato acknowledgment per \"{}\" / \"{}\"".format(msg_data.split(':')[1], msg_data.split(':')[2]))
+	msg_data = ':'.join(msg_data.split(':')[1:])
+	action_response = icinga_do_ack(msg_data)
+	bot.answerCallbackQuery(msg_query_id, text="Inviato acknowledgment di {} su {}".format(msg_data.split("!")[1], msg_data.split("!")[0]))
 
 
 def callback_get(msg, msg_chat_id, msg_query_id):
 	pass
 
 
-def icinga_hosts():
+def callback_broadcast(msg, msg_chat_id, msg_query_id):
+	pass
+
+
+def icinga_do_ack(problem):
+	request_data = {
+		'author': 'Telebot',
+		'comment': 'Acknowledgement (via Telegram Bot)',
+		'notify': True,
+		'type': 'Service',
+		'filter': 'service.__name == "{}"'.format(problem)
+	}
+	return _icinga_request('/v1/actions/acknowledge-problem', 'POST', json.dumps(request_data))
+
+
+def icinga_get_hosts():
 	hosts = list()
 	request_response = _icinga_request('/v1/objects/hosts', 'GET')
 	for host in request_response.json()['results']:
@@ -79,11 +95,26 @@ def icinga_hosts():
 	return sorted(hosts, key=lambda k: k['display_name'])
 
 
+def icinga_get_problems():
+	# TODO: remove already acknowledged
+	request_data = {
+		'filter': 'service.state != service_state && service.acknowledgement == service_ack && host.acknowledgement != host_ack',
+		'filter_vars': {
+			'service_state': 0.0,
+			'service_ack': 0,
+			'host_ack': 2
+		}
+	}
+	request_results = [{'display_name': problem['attrs']['__name'].replace('!', ': '), 'problem_name': problem['attrs']['__name']}
+					   for problem in _icinga_request('/v1/objects/services', 'GET', json.dumps(request_data)).json()['results']]
+	return sorted(request_results, key=lambda k: k['display_name'])
+
+
 def icinga_host_services(host):
 	return []
 
 
-def _icinga_request(url, method):
+def _icinga_request(url, method, data={}):
 	global session
 	global icinga2_host
 	global icinga2_api_port
@@ -94,6 +125,7 @@ def _icinga_request(url, method):
 	}
 	request_args = {
 		'url': 'https://' + icinga2_host + ':' + icinga2_api_port + url,
+		'data': data,
 		'verify': False,
 	}
 	return session.post(**request_args)
