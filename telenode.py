@@ -89,7 +89,9 @@ def callback_ack(msg_data, msg_chat_id, msg_query_id):
 
 
 def callback_broadcast(msg_data, msg_chat_id, msg_query_id):
-	broadcast_sender = '{} {}'.format(msg_data['chat']['first_name'], msg_data['chat']['last_name'])
+	broadcast_sender = msg_data['chat']['first_name']
+	if 'last_name' in msg_data['chat']:
+	    broadcast_sender += ' ' + msg_data['chat']['last_name']
 	broadcast_sender_username = msg_data['chat']['username']
 	broadcast_content = msg_data['text']
 
