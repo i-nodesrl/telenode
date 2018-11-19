@@ -91,7 +91,7 @@ def callback_ack(msg_data, msg_chat_id, msg_query_id):
 def callback_broadcast(msg_data, msg_chat_id, msg_query_id):
 	broadcast_sender = msg_data['chat']['first_name']
 	if 'last_name' in msg_data['chat']:
-	    broadcast_sender += ' ' + msg_data['chat']['last_name']
+		broadcast_sender += ' ' + msg_data['chat']['last_name']
 	broadcast_sender_username = msg_data['chat']['username']
 	broadcast_content = msg_data['text']
 
@@ -156,7 +156,11 @@ def _icinga_request(url, method, data={}):
 		'data': data,
 		'verify': False,
 	}
-	return session.post(**request_args)
+	while True:
+		try:
+			return session.post(**request_args)
+		except Exception as e:
+			print "Request error: " + str(e) + ". Retrying..."
 
 for env_key in ['TELEGRAM_BOT_TOKEN', 'ICINGA2_API_USER', 'ICINGA2_API_PWD']:
 	if env_key not in os.environ:
