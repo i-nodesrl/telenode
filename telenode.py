@@ -77,6 +77,14 @@ def command_ack(msg, msg_chat_id):
 		bot.sendMessage(msg_chat_id, "Nessun problema rilevato.", parse_mode='Markdown')
 
 
+def command_status(msg, msg_chat_id):
+	problems = icinga_get_problems()
+	if len(problems) > 0:
+		keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=problem['display_name'], callback_data="status:" + problem['problem_name'])] for problem in problems])
+	else:
+		bot.sendMessage(msg_chat_id, "Nessun problema rilevato.", parse_mode='Markdown')
+
+
 def command_broadcast(msg, msg_chat_id):
 	markup = ForceReply()
 	bot.sendMessage(msg_chat_id, 'Broadcast: inserire un messaggio da inviare.', reply_markup=markup)
@@ -86,6 +94,10 @@ def callback_ack(msg_data, msg_chat_id, msg_query_id):
 	msg_data = ':'.join(msg_data.split(':')[1:])
 	action_response = icinga_do_ack(msg_data)
 	bot.answerCallbackQuery(msg_query_id, text="Inviato acknowledgment di {} su {}".format(msg_data.split("!")[1], msg_data.split("!")[0]))
+
+
+def callback_status(msg_data, msg_chat_id, msg_query_id):
+	pass
 
 
 def callback_broadcast(msg_data, msg_chat_id, msg_query_id):
