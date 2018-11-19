@@ -154,6 +154,7 @@ def _icinga_request(url, method, data={}):
 	request_args = {
 		'url': 'https://' + icinga2_host + ':' + icinga2_api_port + url,
 		'data': data,
+		'timeout': 1,
 		'verify': False,
 	}
 	while True:
