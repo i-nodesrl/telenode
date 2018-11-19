@@ -80,7 +80,8 @@ def command_ack(msg, msg_chat_id):
 def command_status(msg, msg_chat_id):
 	problems = icinga_get_problems()
 	if len(problems) > 0:
-		keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=problem['display_name'], callback_data="status:" + problem['problem_name'])] for problem in problems])
+		keyboard = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=problem['display_name'], callback_data="status:" + problem['problem_name'])] for problem in problems]
+		bot.sendMessage(msg_chat_id, "Sono stati rilevati i seguenti problemi", parse_mode='Markdown', reply_markup=keyboard)
 	else:
 		bot.sendMessage(msg_chat_id, "Nessun problema rilevato.", parse_mode='Markdown')
 
