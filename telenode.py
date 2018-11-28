@@ -57,6 +57,7 @@ def on_callback_query(msg):
 		eval("callback_" + msg_data.split(':')[0])(msg_data, msg_chat_id, msg_query_id)
 	except NameError as error:
 		bot.sendMessage(msg_chat_id, "Impossibile eseguire hook su `{}`".format(msg_data), parse_mode='Markdown')
+		print str(error)
 
 
 def command_ping(msg, msg_chat_id):
@@ -101,7 +102,12 @@ def callback_ack(msg_data, msg_chat_id, msg_query_id):
 
 
 def callback_status(msg_data, msg_chat_id, msg_query_id):
-	pass
+	msg_data = ':'.join(msg_data.split(':')[1:])
+	request_response = icinga_get_status(msg_data)
+	if '!' in msg_data:  # is a service
+		bot.sendMessage(msg_chat_id, "Status for: `{}`\n\n```{}```".format(request_response['name'], request_response['output']), parse_mode='Markdown')
+	else:  # is an host
+		bot.sendMessage(msg_chat_id, "Status for: `{}`\n\n```{}```".format(request_response['name'], request_response['output']), parse_mode='Markdown')
 
 
 def callback_broadcast(msg_data, msg_chat_id, msg_query_id):
@@ -137,6 +143,25 @@ def icinga_do_ack(problem):
 			'filter': 'host.__name == "{}"'.format(problem)
 		}
 	return _icinga_request('/v1/actions/acknowledge-problem', 'POST', json.dumps(request_data))
+
+
+def icinga_get_status(problem):
+	request_url = '/v1/objects/{}'
+	if '!' in problem:  # is a service
+		request_url = request_url.format('services')
+		request_data = {
+			'filter': 'service.__name == "{}"'.format(problem)
+		}
+	else:  # is an host
+		request_url = request_url.format('hosts')
+		request_data = {
+			'filter': 'host.__name == "{}"'.format(problem)
+		}
+	response = _icinga_request(request_url, 'GET', json.dumps(request_data)).json()['results'][0]
+	return {
+		'name': response['attrs']['display_name'],
+		'output': response['attrs']['last_check_result']['output'],
+	}
 
 
 def icinga_get_hosts():
