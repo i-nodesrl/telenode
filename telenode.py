@@ -94,7 +94,10 @@ def command_broadcast(msg, msg_chat_id):
 def callback_ack(msg_data, msg_chat_id, msg_query_id):
 	msg_data = ':'.join(msg_data.split(':')[1:])
 	action_response = icinga_do_ack(msg_data)
-	bot.answerCallbackQuery(msg_query_id, text="Inviato acknowledgment di {} su {}".format(msg_data.split("!")[1], msg_data.split("!")[0]))
+	if '!' in msg_data:  # is a service
+		bot.answerCallbackQuery(msg_query_id, text="Inviato acknowledgment di {} su {}".format(msg_data.split("!")[1], msg_data.split("!")[0]))
+	else:  # is an host
+		bot.answerCallbackQuery(msg_query_id, text="Inviato acknowledgment di {}".format(msg_data))
 
 
 def callback_status(msg_data, msg_chat_id, msg_query_id):
@@ -117,13 +120,22 @@ def callback_broadcast(msg_data, msg_chat_id, msg_query_id):
 
 
 def icinga_do_ack(problem):
-	request_data = {
-		'author': 'Telebot',
-		'comment': 'Acknowledgement (via Telegram Bot)',
-		'notify': True,
-		'type': 'Service',
-		'filter': 'service.__name == "{}"'.format(problem)
-	}
+	if '!' in problem:  # is a service
+		request_data = {
+			'author': 'Telebot',
+			'comment': 'Acknowledgement (via Telegram Bot)',
+			'notify': True,
+			'type': 'Service',
+			'filter': 'service.__name == "{}"'.format(problem)
+		}
+	else:  # is an host
+		request_data = {
+			'author': 'Telebot',
+			'comment': 'Acknowledgement (via Telegram Bot)',
+			'notify': True,
+			'type': 'Host',
+			'filter': 'host.__name == "{}"'.format(problem)
+		}
 	return _icinga_request('/v1/actions/acknowledge-problem', 'POST', json.dumps(request_data))
 
 
@@ -138,16 +150,36 @@ def icinga_get_hosts():
 
 
 def icinga_get_problems():
+	# services problems
 	request_data = {
-		'filter': 'service.state != service_state && service.acknowledgement == service_ack && host.acknowledgement != host_ack',
+		'filter': 'service.state != service_state && host.state == host_state && service.acknowledgement == service_ack && host.acknowledgement != host_ack',
 		'filter_vars': {
-			'service_state': 0.0,
-			'service_ack': 0,
-			'host_ack': 2
+			'service_state': 0.0,  # ServiceOK
+			'host_state': 0,  # HostUP
+			'service_ack': 0,  # un-acknowledged
+			'host_ack': 2  # acknowledged
 		}
 	}
-	request_results = [{'display_name': problem['attrs']['__name'].replace('!', ': '), 'problem_name': problem['attrs']['__name']}
-					   for problem in _icinga_request('/v1/objects/services', 'GET', json.dumps(request_data)).json()['results']]
+	request_results = [{
+		'display_name': problem['attrs']['__name'].replace('!', ': '),
+		'problem_name': problem['attrs']['__name'],
+		'type': 'service'
+	}
+		for problem in _icinga_request('/v1/objects/services', 'GET', json.dumps(request_data)).json()['results']]
+	# hosts problems
+	request_data = {
+		'filter': 'host.state != host_state && host.acknowledgement != host_ack',
+		'filter_vars': {
+			'host_state': 0,  # HostUP
+			'host_ack': 1  # acknowledged
+		}
+	}
+	request_results += [{
+		'display_name': '{}: down'.format(problem['attrs']['__name']),
+		'problem_name': problem['attrs']['__name'],
+		'type': 'host'
+	}
+		for problem in _icinga_request('/v1/objects/hosts', 'GET', json.dumps(request_data)).json()['results']]
 	return sorted(request_results, key=lambda k: k['display_name'])
 
 
