@@ -163,7 +163,6 @@ def icinga_get_problems():
 	request_results = [{
 		'display_name': problem['attrs']['__name'].replace('!', ': '),
 		'problem_name': problem['attrs']['__name'],
-		'type': 'service'
 	}
 		for problem in _icinga_request('/v1/objects/services', 'GET', json.dumps(request_data)).json()['results']]
 	# hosts problems
@@ -177,7 +176,6 @@ def icinga_get_problems():
 	request_results += [{
 		'display_name': '{}: down'.format(problem['attrs']['__name']),
 		'problem_name': problem['attrs']['__name'],
-		'type': 'host'
 	}
 		for problem in _icinga_request('/v1/objects/hosts', 'GET', json.dumps(request_data)).json()['results']]
 	return sorted(request_results, key=lambda k: k['display_name'])
