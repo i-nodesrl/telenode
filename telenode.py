@@ -108,6 +108,7 @@ def callback_status(msg_data, msg_chat_id, msg_query_id):
 		bot.sendMessage(msg_chat_id, "Status for: `{}`\n\n```{}```".format(request_response['name'], request_response['output']), parse_mode='Markdown')
 	else:  # is an host
 		bot.sendMessage(msg_chat_id, "Status for: `{}`\n\n```{}```".format(request_response['name'], request_response['output']), parse_mode='Markdown')
+	bot.answerCallbackQuery(msg_query_id, text="Stato oggetto ricevuto correttamente")
 
 
 def callback_broadcast(msg_data, msg_chat_id, msg_query_id):
